@@ -111,4 +111,20 @@ if(EXCHANGE_BUILD_BENCHMARKS)
 
     add_executable(bench_matching_engine benchmarks/bench_matching_engine.cpp)
     target_link_libraries(bench_matching_engine exchange benchmark::benchmark)
+
+    # Comparison benchmark against liquibook (requires the liquibook fetch from tests)
+    if(EXCHANGE_TEST_AGAINST_LIQUIBOOK AND TARGET exchange)
+        if(NOT liquibook_POPULATED)
+            include(FetchContent)
+            FetchContent_Declare(
+                liquibook
+                GIT_REPOSITORY https://github.com/enewhuis/liquibook.git
+                GIT_TAG        2427613b32f1667abae68a01df6af9ba8270f8e7
+            )
+            FetchContent_MakeAvailable(liquibook)
+        endif()
+        add_executable(bench_vs_liquibook benchmarks/bench_vs_liquibook.cpp)
+        target_include_directories(bench_vs_liquibook SYSTEM PRIVATE ${liquibook_SOURCE_DIR}/src)
+        target_link_libraries(bench_vs_liquibook exchange benchmark::benchmark)
+    endif()
 endif()

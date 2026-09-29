@@ -140,6 +140,17 @@ Setup: i5-12600K, GCC 15.2 `-O3 -march=native`, Windows 10, pinned to one P-core
 
 All numbers are single-threaded. The 12600K is a hybrid CPU, and the same binary runs about 2× slower on an E-core, so pin the process when you benchmark. On Windows use `start /affinity 4 bench_matching_engine.exe`; on Linux use `taskset -c 2`. [benchmarks/](benchmarks/bench_matching_engine.cpp) has the exact setup.
 
+### vs [liquibook](https://github.com/enewhuis/liquibook)
+
+Same workload, same machine, same compiler, median of 10 runs.
+
+| Scenario | orderbook-engine | liquibook | Speedup |
+|---|---|---|---|
+| Add + match at top | **107 ns** | 158 ns | 1.5× |
+| Mixed flow (45% add / 45% cancel / 10% IOC) | **61 ns** | 191 ns | 3.1× |
+
+The gap comes mainly from the memory pool and intrusive linked list: liquibook heap-allocates every order and uses `std::list` nodes. The benchmark source is [benchmarks/bench_vs_liquibook.cpp](benchmarks/bench_vs_liquibook.cpp).
+
 ## Layout
 
 ```
