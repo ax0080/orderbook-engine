@@ -15,10 +15,17 @@ jobs:
             flags: -DCMAKE_BUILD_TYPE=Release
           - name: asan-ubsan
             flags: -DCMAKE_BUILD_TYPE=Debug -DEXCHANGE_SANITIZE=ON
+          - name: tsan
+            flags: -DCMAKE_BUILD_TYPE=Debug -DEXCHANGE_TSAN=ON
     name: ${{ matrix.name }}
 
     steps:
       - uses: actions/checkout@v4
+
+      # TSan cannot map its shadow memory with the runner's default ASLR entropy.
+      - name: Reduce ASLR entropy for TSan
+        if: matrix.name == 'tsan'
+        run: sudo sysctl vm.mmap_rnd_bits=28
 
       - name: Install Ninja
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build

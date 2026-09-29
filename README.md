@@ -12,6 +12,7 @@ A price-time priority limit order book and multi-symbol matching engine in C++20
 - **Pooled orders:** `Order` objects come from a memory pool and are linked into an intrusive FIFO, so queueing an order never allocates. The id index and newly created price levels still use the standard allocator.
 - **O(1) cancel:** the order index points straight at the order, which knows its level
 - **Reentrant callbacks:** events are queued and delivered after the book is consistent, so listeners can submit or cancel from inside a callback
+- **Lock-free gateway handoff:** a wait-free SPSC ring buffer (`SpscQueue`) carries `OrderCommand`s from a gateway thread to the matching thread
 
 ## Quick start
 
@@ -90,7 +91,8 @@ PriceLevel:  head <-> Order <-> Order <-> tail   (intrusive, FIFO)
 | Stops held off-book, outside the pool | Pending stops don't touch the hot path or enlarge `Order`. A loop, not recursion, handles cascades |
 | Stop that would trigger on arrival is rejected | Same as most venues. It avoids a hidden market order |
 | Depth feed is opt-in | Per-level updates cost about 20% per operation. Consumers that only need BBO don't pay for them |
-| Single-threaded | No locks on the hot path; scale by sharding symbols across cores |
+| Single-threaded matching | No locks on the hot path; scale by sharding symbols across cores |
+| SPSC queue between gateway and matcher | One writer per index, so no CAS: acquire/release loads and stores only. Head and tail sit on separate cache lines, each side caches the other's index, and the consumer returns slots in batches so a producer waiting on a full queue doesn't steal the consumer's cache line on every message |
 
 | Operation | Cost |
 |---|---|
@@ -121,7 +123,8 @@ For each operation, the listener sees events in this order:
 | Unit tests (70) | Every feature and edge case: FIFO, partial fills, TIF, STP policies, modify priority rules, stop cascades, BBO and depth events, re-entrant listeners, engine routing |
 | Fuzz (4 × 50k ops) | Random flow through every feature under each STP policy. After each operation, `OrderBook::validate()` checks links, level totals, indexes and that the book is not crossed. A listener checks each order's lifecycle: fills sum correctly, and no event arrives after a terminal one |
 | Differential vs [liquibook](https://github.com/enewhuis/liquibook) (3 × 100k ops) | The same random limit, IOC, FOK, market and cancel stream goes to both engines. After each operation, the fill sequence (taker, maker, price, qty) and full depth must be identical |
-| Sanitizers (CI) | The whole suite under ASan and UBSan. The memory pool poisons freed slots, so a use-after-free of a pooled order is reported |
+| SPSC queue | FIFO, full/empty and wraparound edge cases; a two-thread stress test (5M messages through a 64-slot queue) checking every value arrives once and in order; the same order flow matched directly and through a gateway thread must produce identical trades and books |
+| Sanitizers (CI) | The whole suite under ASan + UBSan, and again under ThreadSanitizer. The memory pool poisons freed slots, so a use-after-free of a pooled order is reported |
 
 The fuzz and differential tests were checked by planting bugs: breaking a level total, or matching the newest order in a level before older ones. Each planted bug was caught within the first few hundred operations.
 
@@ -151,12 +154,25 @@ Same workload, same machine, same compiler, median of 10 runs.
 
 The gap comes mainly from the memory pool and intrusive linked list: liquibook heap-allocates every order and uses `std::list` nodes. The benchmark source is [benchmarks/bench_vs_liquibook.cpp](benchmarks/bench_vs_liquibook.cpp).
 
+### Cross-thread handoff
+
+Producer and consumer pinned to two different P-cores; median of 5 runs. The baseline is the same ring buffer guarded by a `std::mutex`.
+
+| Scenario | SPSC queue | Mutex queue | Speedup |
+|---|---|---|---|
+| Throughput, 8-byte messages | **62M msg/s** | 16M msg/s | 3.9× |
+| Round trip (ping-pong between two cores) | **188 ns** | 1,269 ns | 6.7× |
+| Gateway thread → matching thread, mixed order flow | **15.0M orders/s** | 3.7M orders/s | 4.1× |
+
+The same order flow matched on one thread runs at 16.9M orders/s, so the handoff costs about 13%. Before the consumer released slots in batches, the pipeline ran at 7.7M orders/s: with the queue full, the producer re-read the consumer's index on every message and the two cores traded that cache line back and forth. The source is [benchmarks/bench_spsc.cpp](benchmarks/bench_spsc.cpp).
+
 ## Layout
 
 ```
 include/exchange/   types.h  order.h  memory_pool.h  order_book.h  order_listener.h  matching_engine.h
+                    spsc_queue.h  order_command.h
 src/                order_book.cpp  matching_engine.cpp
-tests/              unit tests, fuzz test, liquibook differential test
+tests/              unit tests, fuzz test, liquibook differential test, SPSC queue tests
 benchmarks/         Google Benchmark
 examples/           basic_usage.cpp
 ```

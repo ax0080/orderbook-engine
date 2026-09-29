@@ -31,6 +31,14 @@ if(EXCHANGE_SANITIZE)
     add_link_options(-fsanitize=address,undefined)
 endif()
 
+option(EXCHANGE_TSAN "Build with ThreadSanitizer" OFF)
+if(EXCHANGE_TSAN)
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=thread)
+endif()
+
+find_package(Threads REQUIRED)
+
 # ---------------------------------------------------------------------------
 # Core library
 # ---------------------------------------------------------------------------
@@ -76,6 +84,10 @@ if(EXCHANGE_BUILD_TESTS)
     target_link_libraries(test_fuzz exchange GTest::gtest_main)
     add_test(NAME FuzzTests COMMAND test_fuzz)
 
+    add_executable(test_spsc_queue tests/test_spsc_queue.cpp)
+    target_link_libraries(test_spsc_queue exchange GTest::gtest_main Threads::Threads)
+    add_test(NAME SpscQueueTests COMMAND test_spsc_queue)
+
     # Differential test against liquibook (header-only, BSD-style license).
     option(EXCHANGE_TEST_AGAINST_LIQUIBOOK "Cross-check fills and depth against liquibook" ON)
     if(EXCHANGE_TEST_AGAINST_LIQUIBOOK)
@@ -111,6 +123,9 @@ if(EXCHANGE_BUILD_BENCHMARKS)
 
     add_executable(bench_matching_engine benchmarks/bench_matching_engine.cpp)
     target_link_libraries(bench_matching_engine exchange benchmark::benchmark)
+
+    add_executable(bench_spsc benchmarks/bench_spsc.cpp)
+    target_link_libraries(bench_spsc exchange benchmark::benchmark Threads::Threads)
 
     # Comparison benchmark against liquibook (requires the liquibook fetch from tests)
     if(EXCHANGE_TEST_AGAINST_LIQUIBOOK AND TARGET exchange)
