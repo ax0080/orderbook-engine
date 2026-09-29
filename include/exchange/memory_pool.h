@@ -28,9 +28,8 @@
 namespace exchange {
 
 template <typename T, std::size_t BlockSize = 4096>
+    requires (sizeof(T) >= sizeof(void*))
 class MemoryPool {
-    static_assert(sizeof(T) >= sizeof(void*),
-                  "Object must be at least pointer-sized for free-list linkage");
 
     struct alignas(alignof(T)) Block {
         unsigned char data[sizeof(T) * BlockSize];

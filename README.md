@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ax0080/orderbook-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/ax0080/orderbook-engine/actions/workflows/ci.yml)
 
-A price-time priority limit order book and multi-symbol matching engine in C++17.
+A price-time priority limit order book and multi-symbol matching engine in C++20.
 
 - **Order types:** Limit, Market, Stop, and Stop-Limit. Stops trigger on the last trade price, including cascades.
 - **Time in force:** GTC, IOC, FOK
@@ -25,7 +25,7 @@ ctest --test-dir build              # unit, fuzz and liquibook differential test
 ./build/bench_matching_engine
 ```
 
-Requires CMake 3.20+ and a C++17 compiler. GoogleTest and Google Benchmark are fetched automatically.
+Requires CMake 3.20+ and a C++20 compiler. GoogleTest and Google Benchmark are fetched automatically.
 
 ```cpp
 #include "exchange/matching_engine.h"

@@ -1,6 +1,7 @@
 #include "exchange/order_book.h"
 
 #include <algorithm>
+#include <ranges>
 #include <type_traits>
 
 namespace exchange {
@@ -442,9 +443,9 @@ void OrderBook::finish() {
     if (!listener_) return;
 
     if (!dirty_levels_.empty()) {
-        std::sort(dirty_levels_.begin(), dirty_levels_.end());
-        dirty_levels_.erase(std::unique(dirty_levels_.begin(), dirty_levels_.end()),
-                            dirty_levels_.end());
+        std::ranges::sort(dirty_levels_);
+        auto [first, last] = std::ranges::unique(dirty_levels_);
+        dirty_levels_.erase(first, last);
         for (auto [side, price] : dirty_levels_) {
             const LevelMap& levels = side == Side::Buy ? bids_ : asks_;
             auto it = levels.find(key(side, price));

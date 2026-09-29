@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <compare>
 #include <cstdint>
 
 namespace exchange {
@@ -26,12 +27,7 @@ struct Price {
         return static_cast<double>(raw) / MULTIPLIER;
     }
 
-    constexpr bool operator==(Price o) const { return raw == o.raw; }
-    constexpr bool operator!=(Price o) const { return raw != o.raw; }
-    constexpr bool operator< (Price o) const { return raw <  o.raw; }
-    constexpr bool operator> (Price o) const { return raw >  o.raw; }
-    constexpr bool operator<=(Price o) const { return raw <= o.raw; }
-    constexpr bool operator>=(Price o) const { return raw >= o.raw; }
+    constexpr auto operator<=>(const Price&) const = default;
 };
 
 enum class Side : uint8_t {

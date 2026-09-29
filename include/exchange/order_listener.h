@@ -23,11 +23,7 @@ struct BookTop {
     Price    ask_price;
     uint64_t ask_qty = 0;
 
-    bool operator==(const BookTop& o) const {
-        return bid_price == o.bid_price && bid_qty == o.bid_qty &&
-               ask_price == o.ask_price && ask_qty == o.ask_qty;
-    }
-    bool operator!=(const BookTop& o) const { return !(*this == o); }
+    bool operator==(const BookTop&) const = default;
 };
 
 // One aggregated price level. quantity == 0 means the level was removed.
